@@ -1,0 +1,56 @@
+export const Colors = {
+  light: {
+    primary: "#10b981",
+    primaryDark: "#059669",
+    primaryLight: "#d1fae5",
+    background: "#f8fafc",
+    card: "#ffffff",
+    text: "#0f172a",
+    textSecondary: "#64748b",
+    textMuted: "#94a3b8",
+    border: "#e2e8f0",
+    danger: "#ef4444",
+    warning: "#f59e0b",
+    success: "#22c55e",
+    skeleton: "#e2e8f0",
+  },
+  dark: {
+    primary: "#34d399",
+    primaryDark: "#10b981",
+    primaryLight: "#064e3b",
+    background: "#0f172a",
+    card: "#1e293b",
+    text: "#f8fafc",
+    textSecondary: "#94a3b8",
+    textMuted: "#64748b",
+    border: "#334155",
+    danger: "#f87171",
+    warning: "#fbbf24",
+    success: "#4ade80",
+    skeleton: "#334155",
+  },
+};
+
+export const CategoryColors: Record<string, string> = {
+  food: "#f97316",
+  transportation: "#3b82f6",
+  housing: "#8b5cf6",
+  utilities: "#eab308",
+  entertainment: "#ec4899",
+  healthcare: "#ef4444",
+  shopping: "#14b8a6",
+  education: "#6366f1",
+  other: "#6b7280",
+};
+
+export const CategoryIcons: Record<string, string> = {
+  food: "restaurant",
+  transportation: "directions-car",
+  housing: "home",
+  utilities: "bolt",
+  entertainment: "movie",
+  healthcare: "local-hospital",
+  shopping: "shopping-bag",
+  education: "school",
+  other: "more-horiz",
+};
