@@ -2,6 +2,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import apiClient from "@/src/api/axios";
 import SelectionModal from "@/src/components/SelectionModal";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -9,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -17,46 +19,23 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const CURRENCIES = [
-  { code: "INR", label: "₹ INR — Indian Rupee" },
-  { code: "USD", label: "$ USD — United States Dollar" },
-  { code: "EUR", label: "€ EUR — Euro" },
-  { code: "GBP", label: "£ GBP — British Pound" },
-  { code: "JPY", label: "¥ JPY — Japanese Yen" },
-  { code: "AUD", label: "$ AUD — Australian Dollar" },
-  { code: "CAD", label: "$ CAD — Canadian Dollar" },
-  { code: "CHF", label: "Fr CHF — Swiss Franc" },
-  { code: "CNY", label: "¥ CNY — Chinese Yuan" },
-  { code: "SEK", label: "kr SEK — Swedish Krona" },
-  { code: "NZD", label: "$ NZD — New Zealand Dollar" },
-  { code: "HKD", label: "$ HKD — Hong Kong Dollar" },
-  { code: "SGD", label: "$ SGD — Singapore Dollar" },
-  { code: "NOK", label: "kr NOK — Norwegian Krone" },
-  { code: "KRW", label: "₩ KRW — South Korean Won" },
-  { code: "MXN", label: "$ MXN — Mexican Peso" },
-  { code: "BRL", label: "R$ BRL — Brazilian Real" },
-  { code: "ZAR", label: "R ZAR — South African Rand" },
-  { code: "TRY", label: "₺ TRY — Turkish Lira" },
-  { code: "AED", label: "د.إ AED — UAE Dirham" },
-  { code: "USD", label: "$ USD — United States Dollar" },
-  { code: "EUR", label: "€ EUR — Euro" },
-  { code: "GBP", label: "£ GBP — British Pound" },
-  { code: "JPY", label: "¥ JPY — Japanese Yen" },
-  { code: "AUD", label: "$ AUD — Australian Dollar" },
-  { code: "CAD", label: "$ CAD — Canadian Dollar" },
-  { code: "CHF", label: "Fr CHF — Swiss Franc" },
-  { code: "CNY", label: "¥ CNY — Chinese Yuan" },
-  { code: "SEK", label: "kr SEK — Swedish Krona" },
-  { code: "NZD", label: "$ NZD — New Zealand Dollar" },
-  { code: "HKD", label: "$ HKD — Hong Kong Dollar" },
-  { code: "SGD", label: "$ SGD — Singapore Dollar" },
-  { code: "NOK", label: "kr NOK — Norwegian Krone" },
-  { code: "KRW", label: "₩ KRW — South Korean Won" },
-  { code: "MXN", label: "$ MXN — Mexican Peso" },
-  { code: "BRL", label: "R$ BRL — Brazilian Real" },
-  { code: "ZAR", label: "R ZAR — South African Rand" },
-  { code: "TRY", label: "₺ TRY — Turkish Lira" },
-  { code: "AED", label: "د.إ AED — UAE Dirham" },
+  { code: "INR", label: "Indian Rupee", symbol: "₹" },
+  { code: "USD", label: "US Dollar", symbol: "$" },
+  { code: "EUR", label: "Euro", symbol: "€" },
+  { code: "GBP", label: "British Pound", symbol: "£" },
+  { code: "JPY", label: "Japanese Yen", symbol: "¥" },
+  { code: "AUD", label: "Australian Dollar", symbol: "A$" },
 ];
+
+interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  currency: string;
+  totalMembers: number;
+  totalExpenses: number;
+  createdBy: string;
+}
 
 interface GroupMember {
   email: string;
@@ -67,6 +46,7 @@ export default function GroupsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [showCreate, setShowCreate] = useState(false);
   const [groupName, setGroupName] = useState("");
@@ -74,10 +54,74 @@ export default function GroupsScreen() {
   const [memberEmail, setMemberEmail] = useState("");
   const [memberName, setMemberName] = useState("");
   const [members, setMembers] = useState<GroupMember[]>([]);
-  const [loading, setLoading] = useState(false);
 
   const [currency, setCurrency] = useState("INR");
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+
+  // Fetch Groups
+  const {
+    data: groups,
+    isLoading: isLoadingGroups,
+    refetch,
+  } = useQuery({
+    queryKey: ["groups"],
+    queryFn: async () => {
+      const res = await apiClient.get("/groups");
+      return res.data.data as Group[];
+    },
+  });
+
+  const createGroupMutation = useMutation({
+    mutationFn: async () => {
+      // 1. Create the group
+      const groupRes = await apiClient.post("/groups", {
+        name: groupName.trim(),
+        description: groupDescription.trim() || undefined,
+        currency: currency,
+      });
+
+      const groupId = groupRes.data?.data?.id;
+      if (!groupId) throw new Error("Failed to get group ID");
+
+      // 2. Add each member
+      let addedCount = 0;
+      for (const member of members) {
+        try {
+          await apiClient.post(`/groups/${groupId}/members`, {
+            email: member.email,
+            displayName: member.displayName,
+          });
+          addedCount++;
+        } catch (err: any) {
+          console.warn(`Failed to add ${member.email}`, err);
+        }
+      }
+      return { groupName: groupName.trim(), addedCount };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["groups"] });
+      // Reset form
+      setShowCreate(false);
+      setGroupName("");
+      setGroupDescription("");
+      setMembers([]);
+      setMemberEmail("");
+      setMemberName("");
+      setCurrency("INR");
+
+      Alert.alert(
+        "Success",
+        `Group "${data.groupName}" created with ${data.addedCount} member(s)!`,
+      );
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to create group";
+      Alert.alert("Error", msg);
+    },
+  });
 
   const addMember = () => {
     if (!memberEmail.trim()) {
@@ -107,64 +151,12 @@ export default function GroupsScreen() {
     setMembers(members.filter((m) => m.email !== email));
   };
 
-  const handleCreateGroup = async () => {
+  const handleCreateGroup = () => {
     if (!groupName.trim()) {
       Alert.alert("Error", "Group name is required");
       return;
     }
-
-    setLoading(true);
-    try {
-      // 1. Create the group
-      const groupRes = await apiClient.post("/groups", {
-        name: groupName.trim(),
-        description: groupDescription.trim() || undefined,
-        currency: currency,
-      });
-
-      const groupId = groupRes.data?.data?.id;
-      if (!groupId) throw new Error("Failed to get group ID");
-
-      // 2. Add each member
-      let addedCount = 0;
-      for (const member of members) {
-        try {
-          await apiClient.post(`/groups/${groupId}/members`, {
-            email: member.email,
-            displayName: member.displayName,
-          });
-          addedCount++;
-        } catch (err: any) {
-          const msg =
-            err?.response?.data?.message || `Failed to add ${member.email}`;
-          Alert.alert("Warning", msg);
-        }
-      }
-
-      Alert.alert(
-        "Success",
-        `Group "${groupName}" created with ${addedCount} member(s)!`,
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              setShowCreate(false);
-              setGroupName("");
-              setGroupDescription("");
-              setMembers([]);
-            },
-          },
-        ],
-      );
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to create group";
-      Alert.alert("Error", msg);
-    } finally {
-      setLoading(false);
-    }
+    createGroupMutation.mutate();
   };
 
   const resetForm = () => {
@@ -174,6 +166,7 @@ export default function GroupsScreen() {
     setMembers([]);
     setMemberEmail("");
     setMemberName("");
+    setCurrency("INR");
   };
 
   return (
@@ -195,8 +188,17 @@ export default function GroupsScreen() {
             isDark ? "text-dark-text" : "text-slate-900"
           }`}
         >
-          Split Expenses
+          {showCreate ? "Create Group" : "Your Groups"}
         </Text>
+        {!showCreate && (
+          <Pressable onPress={() => setShowCreate(true)}>
+            <MaterialIcons
+              name="add"
+              size={28}
+              color={isDark ? "#10b981" : "#10b981"}
+            />
+          </Pressable>
+        )}
       </View>
 
       <KeyboardAvoidingView
@@ -205,74 +207,21 @@ export default function GroupsScreen() {
       >
         <ScrollView
           className="flex-1 px-5"
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: 100 }}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={isLoadingGroups} onRefresh={refetch} />
+          }
         >
           {!showCreate ? (
-            /* Landing / Create button */
-            <View className="flex-1 items-center justify-center pt-12">
-              <View
-                className={`w-24 h-24 rounded-full items-center justify-center mb-6 ${
-                  isDark ? "bg-dark-card" : "bg-primary-50"
-                }`}
-              >
-                <MaterialIcons name="group-add" size={48} color="#10b981" />
-              </View>
-              <Text
-                className={`text-xl font-bold mb-2 text-center ${
-                  isDark ? "text-dark-text" : "text-slate-900"
-                }`}
-              >
-                Split Expenses with Friends
-              </Text>
-              <Text
-                className={`text-sm text-center mb-8 px-4 ${
-                  isDark ? "text-dark-muted" : "text-slate-500"
-                }`}
-              >
-                Create a group, add members, and track shared expenses together.
-                Everyone gets their fair share!
-              </Text>
-
-              <Pressable
-                onPress={() => setShowCreate(true)}
-                className="bg-primary-500 px-8 py-4 rounded-2xl flex-row items-center"
-                style={{
-                  shadowColor: "#10b981",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 4,
-                }}
-              >
-                <MaterialIcons name="add" size={22} color="#fff" />
-                <Text className="text-white font-bold text-base ml-2">
-                  Create New Group
-                </Text>
-              </Pressable>
-
-              {/* Feature highlights */}
-              <View className="mt-10 w-full">
-                {[
-                  {
-                    icon: "calculate" as const,
-                    title: "Auto Split",
-                    desc: "Expenses split equally among members",
-                  },
-                  {
-                    icon: "track-changes" as const,
-                    title: "Track Balances",
-                    desc: "See who owes what in real time",
-                  },
-                  {
-                    icon: "handshake" as const,
-                    title: "Easy Settlement",
-                    desc: "Settle up with one tap",
-                  },
-                ].map((item, i) => (
-                  <View
-                    key={i}
-                    className={`flex-row items-center p-4 rounded-2xl mb-3 ${
+            /* Groups List */
+            <View>
+              {groups && groups.length > 0 ? (
+                groups.map((group) => (
+                  <Pressable
+                    key={group.id}
+                    onPress={() => router.push(`/groups/${group.id}` as any)} // Navigate to details (if implemented later) or just show info
+                    className={`p-4 rounded-2xl mb-3 ${
                       isDark ? "bg-dark-card" : "bg-white"
                     }`}
                     style={{
@@ -280,35 +229,86 @@ export default function GroupsScreen() {
                       shadowOffset: { width: 0, height: 1 },
                       shadowOpacity: 0.05,
                       shadowRadius: 3,
-                      elevation: 1,
+                      elevation: 2,
                     }}
                   >
-                    <View className="w-10 h-10 rounded-xl bg-primary-50 items-center justify-center mr-3">
-                      <MaterialIcons
-                        name={item.icon}
-                        size={20}
-                        color="#10b981"
-                      />
-                    </View>
-                    <View className="flex-1">
+                    <View className="flex-row items-center justify-between mb-2">
                       <Text
-                        className={`text-sm font-semibold ${
-                          isDark ? "text-dark-text" : "text-slate-900"
-                        }`}
+                        className={`text-lg font-bold ${isDark ? "text-dark-text" : "text-slate-900"}`}
                       >
-                        {item.title}
+                        {group.name}
                       </Text>
                       <Text
-                        className={`text-xs ${
-                          isDark ? "text-dark-muted" : "text-slate-500"
-                        }`}
+                        className={`text-xs px-2 py-1 rounded-full font-bold ${isDark ? "bg-primary-900 text-primary-300" : "bg-primary-50 text-primary-700"}`}
                       >
-                        {item.desc}
+                        {group.currency}
                       </Text>
                     </View>
+                    <Text
+                      className={`text-sm mb-3 ${isDark ? "text-dark-muted" : "text-slate-500"}`}
+                    >
+                      {group.description || "No description"}
+                    </Text>
+                    <View className="flex-row items-center justify-between border-t border-dashed border-gray-100 dark:border-gray-800 pt-3">
+                      <View className="flex-row items-center">
+                        <MaterialIcons
+                          name="person"
+                          size={16}
+                          color={isDark ? "#94a3b8" : "#64748b"}
+                        />
+                        <Text
+                          className={`ml-1 text-xs ${isDark ? "text-dark-muted" : "text-slate-500"}`}
+                        >
+                          {group.totalMembers} Members
+                        </Text>
+                      </View>
+                      <View className="flex-row items-center">
+                        <MaterialIcons
+                          name="receipt"
+                          size={16}
+                          color={isDark ? "#94a3b8" : "#64748b"}
+                        />
+                        <Text
+                          className={`ml-1 text-xs ${isDark ? "text-dark-muted" : "text-slate-500"}`}
+                        >
+                          {group.totalExpenses} Expenses
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                ))
+              ) : (
+                <View className="items-center justify-center py-20">
+                  <View
+                    className={`w-20 h-20 rounded-full items-center justify-center mb-4 ${isDark ? "bg-dark-card" : "bg-slate-100"}`}
+                  >
+                    <MaterialIcons
+                      name="group-off"
+                      size={40}
+                      color={isDark ? "#475569" : "#94a3b8"}
+                    />
                   </View>
-                ))}
-              </View>
+                  <Text
+                    className={`text-lg font-semibold mb-2 ${isDark ? "text-dark-text" : "text-slate-900"}`}
+                  >
+                    No groups yet
+                  </Text>
+                  <Text
+                    className={`text-center px-10 ${isDark ? "text-dark-muted" : "text-slate-500"}`}
+                  >
+                    Create a group to start splitting expenses with your
+                    friends!
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowCreate(true)}
+                    className="mt-6 bg-primary-500 px-6 py-3 rounded-xl"
+                  >
+                    <Text className="text-white font-bold">
+                      Create First Group
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           ) : (
             /* Create Group Form */
@@ -512,27 +512,31 @@ export default function GroupsScreen() {
               {/* Action Buttons */}
               <Pressable
                 onPress={handleCreateGroup}
-                disabled={loading}
+                disabled={createGroupMutation.isPending}
                 className={`py-4 rounded-2xl items-center mb-3 ${
-                  loading ? "bg-primary-300" : "bg-primary-500"
+                  createGroupMutation.isPending
+                    ? "bg-primary-300"
+                    : "bg-primary-500"
                 }`}
                 style={{
                   shadowColor: "#10b981",
                   shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: loading ? 0 : 0.3,
+                  shadowOpacity: createGroupMutation.isPending ? 0 : 0.3,
                   shadowRadius: 8,
-                  elevation: loading ? 0 : 4,
+                  elevation: createGroupMutation.isPending ? 0 : 4,
                 }}
               >
                 <Text className="text-white font-bold text-base">
-                  {loading ? "Creating..." : "Create Group"}
+                  {createGroupMutation.isPending
+                    ? "Creating..."
+                    : "Create Group"}
                 </Text>
               </Pressable>
 
               <Pressable
                 onPress={resetForm}
                 className="py-3 items-center"
-                disabled={loading}
+                disabled={createGroupMutation.isPending}
               >
                 <Text
                   className={`font-semibold ${
@@ -551,7 +555,7 @@ export default function GroupsScreen() {
         onClose={() => setShowCurrencyModal(false)}
         title="Select Group Currency"
         options={CURRENCIES.map((c) => ({
-          label: `${c.label} (${c.code})`,
+          label: `${c.label} (${c.symbol})`,
           value: c.code,
           icon: "attach-money",
         }))}
