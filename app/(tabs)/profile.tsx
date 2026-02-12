@@ -6,6 +6,16 @@ import { useAuthStore } from "@/src/store/auth.store";
 import { MaterialIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { Alert, Appearance, Pressable, Switch, Text, View } from "react-native";
+import SelectionModal from "@/src/components/SelectionModal";
+
+const CURRENCIES = [
+  { code: "INR", label: "₹ INR — Indian Rupee" },
+  { code: "USD", label: "$ USD — US Dollar" },
+  { code: "EUR", label: "€ EUR — Euro" },
+  { code: "GBP", label: "£ GBP — British Pound" },
+  { code: "JPY", label: "¥ JPY — Japanese Yen" },
+  { code: "AUD", label: "A$ AUD — Australian Dollar" },
+];
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
@@ -14,8 +24,10 @@ export default function ProfileScreen() {
   const { data: profile } = useProfile();
   const updatePreferences = useUpdatePreferences();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
 
   const displayUser = profile || user;
+  const pushEnabled = displayUser?.preferences?.notifications?.push ?? true;
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to sign out?", [
@@ -40,6 +52,28 @@ export default function ProfileScreen() {
     const newTheme = isDark ? "light" : "dark";
     Appearance.setColorScheme(newTheme);
     updatePreferences.mutate({ theme: newTheme });
+  };
+
+  const handleCurrencySelect = (code: string) => {
+    updatePreferences.mutate({ currency: code });
+  };
+
+  const handleNotificationToggle = (val: boolean) => {
+    updatePreferences.mutate({
+      notifications: {
+        email: val,
+        push: val,
+        sms: val,
+      },
+    });
+  };
+
+  const handleVerifyEmail = () => {
+    Alert.alert(
+      "Verify Email",
+      "Supabase sends a verification email when you register. Please check your inbox (and spam folder) for the verification link.\n\nIf you need a new link, please log out and register again.",
+      [{ text: "OK" }],
+    );
   };
 
   const MenuItem = ({
@@ -148,7 +182,9 @@ export default function ProfileScreen() {
               isDark ? "text-dark-text" : "text-slate-900"
             }`}
           >
-            {displayUser?.display_name || "User"}
+            {displayUser?.display_name ||
+              displayUser?.email?.split("@")[0] ||
+              "User"}
           </Text>
           <Text
             className={`text-sm mt-1 ${
@@ -169,25 +205,31 @@ export default function ProfileScreen() {
 
           {/* Status badges */}
           <View className="flex-row gap-2 mt-3">
-            <View
-              className={`px-3 py-1 rounded-full ${
-                displayUser?.is_email_verified
-                  ? "bg-success-50"
-                  : "bg-warning-50"
-              }`}
+            <Pressable
+              onPress={
+                displayUser?.is_email_verified ? undefined : handleVerifyEmail
+              }
             >
-              <Text
-                className={`text-xs font-medium ${
+              <View
+                className={`px-3 py-1 rounded-full ${
                   displayUser?.is_email_verified
-                    ? "text-success-600"
-                    : "text-warning-600"
+                    ? "bg-success-50"
+                    : "bg-warning-50"
                 }`}
               >
-                {displayUser?.is_email_verified
-                  ? "✓ Email Verified"
-                  : "⚠ Email Unverified"}
-              </Text>
-            </View>
+                <Text
+                  className={`text-xs font-medium ${
+                    displayUser?.is_email_verified
+                      ? "text-success-600"
+                      : "text-warning-600"
+                  }`}
+                >
+                  {displayUser?.is_email_verified
+                    ? "✓ Email Verified"
+                    : "⚠ Tap to Verify Email"}
+                </Text>
+              </View>
+            </Pressable>
           </View>
         </View>
 
@@ -213,11 +255,14 @@ export default function ProfileScreen() {
             icon="language"
             label="Currency"
             value={displayUser?.preferences?.currency || "INR"}
+            onPress={() => setShowCurrencyModal(true)}
           />
           <MenuItem
             icon="notifications"
             label="Notifications"
-            value={displayUser?.preferences?.notifications?.push ? "On" : "Off"}
+            showToggle
+            toggleValue={pushEnabled}
+            onToggle={handleNotificationToggle}
           />
           <MenuItem icon="security" label="Privacy & Security" />
           <MenuItem icon="help-outline" label="Help & Support" />
@@ -241,6 +286,19 @@ export default function ProfileScreen() {
         >
           SpendWise v1.0.0
         </Text>
+
+        <SelectionModal
+          visible={showCurrencyModal}
+          onClose={() => setShowCurrencyModal(false)}
+          title="Select Currency"
+          options={CURRENCIES.map((c) => ({
+            label: `${c.label} (${c.code})`,
+            value: c.code,
+            icon: "attach-money",
+          }))}
+          onSelect={handleCurrencySelect}
+          selectedValue={displayUser?.preferences?.currency}
+        />
       </View>
     </ScreenWrapper>
   );

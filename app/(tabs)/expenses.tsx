@@ -64,7 +64,8 @@ export default function ExpensesScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         className="px-5 py-3"
-        contentContainerStyle={{ gap: 8 }}
+        contentContainerStyle={{ gap: 8, alignItems: "center" }}
+        style={{ flexGrow: 0 }}
       >
         <Pressable
           onPress={() => setSelectedCategory(undefined)}

@@ -105,6 +105,7 @@ export default function DashboardScreen() {
             </Text>
           </View>
           <Pressable
+            onPress={() => router.push("/notifications" as Href)}
             className={`w-11 h-11 rounded-full items-center justify-center ${
               isDark ? "bg-dark-card" : "bg-white"
             }`}
@@ -212,6 +213,46 @@ export default function DashboardScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Split Expenses Quick Action */}
+        <Pressable
+          onPress={() => router.push("/groups" as Href)}
+          className={`flex-row items-center p-4 rounded-2xl mb-6 ${
+            isDark ? "bg-dark-card" : "bg-white"
+          }`}
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: isDark ? 0.3 : 0.05,
+            shadowRadius: 4,
+            elevation: 1,
+          }}
+        >
+          <View className="w-10 h-10 rounded-xl bg-primary-50 items-center justify-center mr-3">
+            <MaterialIcons name="group" size={22} color="#10b981" />
+          </View>
+          <View className="flex-1">
+            <Text
+              className={`text-sm font-semibold ${
+                isDark ? "text-dark-text" : "text-slate-900"
+              }`}
+            >
+              Split Expenses
+            </Text>
+            <Text
+              className={`text-xs ${
+                isDark ? "text-dark-muted" : "text-slate-500"
+              }`}
+            >
+              Create groups and split bills with friends
+            </Text>
+          </View>
+          <MaterialIcons
+            name="chevron-right"
+            size={20}
+            color={isDark ? "#64748b" : "#94a3b8"}
+          />
+        </Pressable>
 
         {/* Category Breakdown */}
         {topCategories.length > 0 && (

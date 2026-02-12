@@ -4,10 +4,16 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Href, Slot, useRouter, useSegments } from "expo-router";
+import {
+  Href,
+  Slot,
+  useRootNavigationState,
+  useRouter,
+  useSegments,
+} from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import "../global.css";
@@ -32,7 +38,7 @@ function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
   const { isAuthenticated, isLoading, initialize } = useAuthStore();
-  const hasNavigated = useRef(false);
+  const rootNavigationState = useRootNavigationState();
 
   // Initialize auth on mount
   useEffect(() => {
@@ -42,17 +48,16 @@ function AuthGate() {
   // Handle auth-based navigation
   useEffect(() => {
     if (isLoading) return;
+    if (!rootNavigationState?.key) return;
 
-    const inAuthGroup = (segments[0] as string) === "(auth)";
+    const inAuthGroup = segments[0] === "(auth)";
 
     if (!isAuthenticated && !inAuthGroup) {
-      hasNavigated.current = true;
       router.replace("/(auth)/login" as Href);
     } else if (isAuthenticated && inAuthGroup) {
-      hasNavigated.current = true;
       router.replace("/(tabs)/dashboard" as Href);
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, rootNavigationState]);
 
   // Hide splash screen when auth state is determined
   useEffect(() => {
@@ -66,7 +71,7 @@ function AuthGate() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const store = useAuthStore.getState();
+      // const store = useAuthStore.getState();
 
       if (event === "SIGNED_IN" && session) {
         useAuthStore.setState({
