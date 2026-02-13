@@ -21,6 +21,7 @@ import "../global.css";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { supabase } from "@/src/api/supabase";
 import { useAuthStore } from "@/src/store/auth.store";
+import { usePushNotifications } from "../src/hooks/usePushNotifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,6 +41,8 @@ function AuthGate() {
   const { isAuthenticated, isLoading, initialize } = useAuthStore();
   const rootNavigationState = useRootNavigationState();
 
+  usePushNotifications();
+
   // Initialize auth on mount
   useEffect(() => {
     initialize();
@@ -57,7 +60,7 @@ function AuthGate() {
     } else if (isAuthenticated && inAuthGroup) {
       router.replace("/(tabs)/dashboard" as Href);
     }
-  }, [isAuthenticated, isLoading, segments, rootNavigationState]);
+  }, [isAuthenticated, isLoading, segments, rootNavigationState, router]);
 
   // Hide splash screen when auth state is determined
   useEffect(() => {
