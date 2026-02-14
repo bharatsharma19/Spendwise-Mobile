@@ -2,6 +2,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import EmptyState from "@/src/components/EmptyState";
 import ScreenWrapper from "@/src/components/ScreenWrapper";
 import { DashboardSkeleton } from "@/src/components/SkeletonLoader";
+import { useCurrency } from "@/src/hooks/useCurrency";
 import {
   useCategoryStats,
   useExpenseSummary,
@@ -38,7 +39,7 @@ export default function InsightsScreen() {
     refetch: refetchTrends,
   } = useExpenseTrends("monthly");
 
-  const isLoading = summaryLoading && categoryLoading && trendsLoading;
+  const isLoading = summaryLoading || categoryLoading || trendsLoading;
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
@@ -47,13 +48,7 @@ export default function InsightsScreen() {
     setRefreshing(false);
   }, [refetchSummary, refetchCategory, refetchTrends]);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const { formatCurrency } = useCurrency();
 
   const sortedCategories = useMemo(() => {
     if (!categoryStats) return [];

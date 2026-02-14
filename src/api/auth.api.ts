@@ -16,6 +16,25 @@ export const authApi = {
     return response.data.data;
   },
 
+  resetPassword: async (email: string): Promise<void> => {
+    await apiClient.post("/auth/reset-password", { email });
+  },
+
+  verifyPhone: async (phoneNumber: string): Promise<void> => {
+    await apiClient.post("/auth/verify-phone", { phoneNumber });
+  },
+
+  verifyPhoneCode: async (
+    phoneNumber: string,
+    code: string,
+  ): Promise<{ actionLink?: string }> => {
+    const response = await apiClient.post<{ data: { actionLink?: string } }>(
+      "/auth/verify-phone-code",
+      { phoneNumber, code },
+    );
+    return response.data.data;
+  },
+
   login: async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

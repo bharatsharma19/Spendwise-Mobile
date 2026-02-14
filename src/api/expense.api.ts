@@ -6,6 +6,8 @@ import {
   ExpenseFilters,
   ExpenseSummary,
   ExpenseTrends,
+  PaginatedApiResponse,
+  PaginationParams,
   UpdateExpenseDto,
 } from "../types";
 import apiClient from "./axios";
@@ -23,6 +25,26 @@ export const expenseApi = {
       params,
     });
     return response.data.data;
+  },
+
+  getExpensesPaginated: async (
+    filters?: ExpenseFilters,
+    pagination?: PaginationParams,
+  ): Promise<PaginatedApiResponse<Expense>> => {
+    const params: Record<string, string> = {};
+    if (filters?.startDate) params.startDate = filters.startDate;
+    if (filters?.endDate) params.endDate = filters.endDate;
+    if (filters?.category) params.category = filters.category;
+    if (filters?.isRecurring !== undefined)
+      params.isRecurring = String(filters.isRecurring);
+    if (pagination?.page) params.page = String(pagination.page);
+    if (pagination?.limit) params.limit = String(pagination.limit);
+
+    const response = await apiClient.get<PaginatedApiResponse<Expense>>(
+      "/expenses",
+      { params },
+    );
+    return response.data;
   },
 
   getExpense: async (id: string): Promise<Expense> => {

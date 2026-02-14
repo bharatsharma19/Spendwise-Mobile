@@ -5,6 +5,17 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
+export interface PaginatedApiResponse<T> {
+  status: "success" | "error";
+  data: T[];
+  pagination: {
+    totalCount: number;
+    page: number;
+    totalPages: number;
+    hasNextPage: boolean;
+  };
+}
+
 export interface ApiError {
   status: "error";
   message: string;

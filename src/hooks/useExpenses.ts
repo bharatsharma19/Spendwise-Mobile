@@ -1,9 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { expenseApi } from "../api/expense.api";
 import {
   CreateExpenseDto,
   Expense,
   ExpenseFilters,
+  PaginatedApiResponse,
   UpdateExpenseDto,
 } from "../types";
 
@@ -11,6 +17,23 @@ export function useExpenses(filters?: ExpenseFilters) {
   return useQuery({
     queryKey: ["expenses", filters],
     queryFn: () => expenseApi.getExpenses(filters),
+  });
+}
+
+export function useInfiniteExpenses(filters?: ExpenseFilters) {
+  return useInfiniteQuery<PaginatedApiResponse<Expense>, Error>({
+    queryKey: ["expenses", "infinite", filters],
+    queryFn: ({ pageParam = 1 }: { pageParam?: unknown }) =>
+      expenseApi.getExpensesPaginated(filters, {
+        page: pageParam as number,
+        limit: 20,
+      }),
+    getNextPageParam: (lastPage) => {
+      return lastPage.pagination.hasNextPage
+        ? lastPage.pagination.page + 1
+        : undefined;
+    },
+    initialPageParam: 1,
   });
 }
 

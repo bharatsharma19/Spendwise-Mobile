@@ -118,6 +118,17 @@ export default function LoginScreen() {
               error={errors.password}
             />
 
+            <View className="items-end mb-4">
+              <Text
+                className={`text-sm ${
+                  isDark ? "text-primary-400" : "text-primary-600"
+                }`}
+                onPress={() => router.push("/(auth)/forgot-password" as Href)}
+              >
+                Forgot Password?
+              </Text>
+            </View>
+
             <AppButton
               title="Sign In"
               onPress={handleLogin}

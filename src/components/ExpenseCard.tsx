@@ -1,7 +1,9 @@
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
+import { useCurrency } from "../hooks/useCurrency";
 import { CategoryColors, CategoryIcons } from "../theme";
 import { Expense } from "../types";
 
@@ -13,6 +15,7 @@ interface ExpenseCardProps {
 export default function ExpenseCard({ expense, onPress }: ExpenseCardProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const { formatCurrency } = useCurrency();
 
   const categoryColor = CategoryColors[expense.category] || "#6b7280";
   const categoryIcon = (CategoryIcons[expense.category] ||
@@ -30,18 +33,14 @@ export default function ExpenseCard({ expense, onPress }: ExpenseCardProps) {
     return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   };
 
-  const formatAmount = (amount: number, currency: string) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: currency || "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
-
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        if (onPress) {
+          Haptics.selectionAsync();
+          onPress();
+        }
+      }}
       className={`flex-row items-center p-4 rounded-2xl mb-3 ${
         isDark ? "bg-dark-card" : "bg-white"
       }`}
@@ -83,7 +82,7 @@ export default function ExpenseCard({ expense, onPress }: ExpenseCardProps) {
 
       {/* Amount */}
       <Text className="text-base font-bold text-danger-500">
-        -{formatAmount(expense.amount, expense.currency)}
+        -{formatCurrency(expense.amount)}
       </Text>
     </Pressable>
   );

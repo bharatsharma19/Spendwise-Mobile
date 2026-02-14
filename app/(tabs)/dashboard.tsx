@@ -3,6 +3,7 @@ import EmptyState from "@/src/components/EmptyState";
 import ExpenseCard from "@/src/components/ExpenseCard";
 import ScreenWrapper from "@/src/components/ScreenWrapper";
 import { DashboardSkeleton } from "@/src/components/SkeletonLoader";
+import { useCurrency } from "@/src/hooks/useCurrency";
 import {
   useCategoryStats,
   useExpenses,
@@ -48,7 +49,7 @@ export default function DashboardScreen() {
     refetch: refetchExpenses,
   } = useExpenses();
 
-  const isLoading = summaryLoading && categoryLoading && expensesLoading;
+  const isLoading = summaryLoading || categoryLoading || expensesLoading;
   const [refreshing, setRefreshing] = React.useState(false);
 
   const onRefresh = useCallback(async () => {
@@ -57,14 +58,7 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [refetchSummary, refetchCategory, refetchExpenses]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  const { formatCurrency } = useCurrency();
 
   const topCategories = useMemo(() => {
     if (!categoryStats) return [];

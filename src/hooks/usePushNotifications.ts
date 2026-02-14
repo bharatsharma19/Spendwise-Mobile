@@ -28,12 +28,24 @@ async function registerForPushNotificationsAsync() {
       console.log("Failed to get push token for push notification!");
       return;
     }
+
+    // Check if running in Expo Go
+    const isExpoGo = Constants.executionEnvironment === "storeClient";
+
+    if (isExpoGo) {
+      console.log("Push notifications are not supported in Expo Go");
+      return;
+    }
+
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ??
       Constants?.easConfig?.projectId;
+
     if (!projectId) {
       console.log("Project ID not found");
+      return;
     }
+
     try {
       const pushTokenString = (
         await Notifications.getExpoPushTokenAsync({

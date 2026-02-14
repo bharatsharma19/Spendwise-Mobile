@@ -1,17 +1,25 @@
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import AppButton from "@/src/components/AppButton";
 import AppInput from "@/src/components/AppInput";
-import { useCreateExpense } from "@/src/hooks/useExpenses";
+import {
+  useCreateExpense,
+  useDeleteExpense,
+  useExpense,
+  useUpdateExpense,
+} from "@/src/hooks/useExpenses";
 import {
   CreateExpenseDto,
   EXPENSE_CATEGORIES,
   ExpenseCategory,
+  UpdateExpenseDto,
 } from "@/src/types";
 import { MaterialIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -20,12 +28,25 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useCurrency } from "../src/hooks/useCurrency";
 
-export default function AddExpenseModal() {
+export default function ExpenseModal() {
   const router = useRouter();
+  const { expenseId } = useLocalSearchParams<{ expenseId: string }>();
+  const isEditing = !!expenseId;
+
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+
   const createExpense = useCreateExpense();
+  const updateExpense = useUpdateExpense();
+  const deleteExpense = useDeleteExpense();
+  const { currencySymbol } = useCurrency();
+
+  // Fetch expense details if editing
+  const { data: expense, isLoading: isLoadingExpense } = useExpense(
+    expenseId || "",
+  );
 
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -33,6 +54,16 @@ export default function AddExpenseModal() {
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Populate form when expense data is loaded
+  useEffect(() => {
+    if (expense) {
+      setAmount(expense.amount.toString());
+      setDescription(expense.description || "");
+      setCategory(expense.category);
+      setDate(new Date(expense.date));
+    }
+  }, [expense]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -47,22 +78,67 @@ export default function AddExpenseModal() {
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    const data: CreateExpenseDto = {
-      amount: parseFloat(amount),
-      category,
-      description: description.trim() || undefined,
-      date: date.toISOString(),
-    };
-
     try {
-      await createExpense.mutateAsync(data);
+      if (isEditing) {
+        const updateData: UpdateExpenseDto = {
+          amount: parseFloat(amount),
+          category,
+          description: description.trim() || undefined,
+          date: date.toISOString(),
+          currency: "INR", // Default to INR for now, or expense.currency
+        };
+        await updateExpense.mutateAsync({ id: expenseId, data: updateData });
+      } else {
+        const createData: CreateExpenseDto = {
+          amount: parseFloat(amount),
+          category,
+          description: description.trim() || undefined,
+          date: date.toISOString(),
+        };
+        await createExpense.mutateAsync(createData);
+      }
       router.back();
     } catch (err: any) {
+      console.error(err);
       setErrors({
-        general: err?.response?.data?.message || "Failed to create expense",
+        general:
+          err?.response?.data?.message ||
+          `Failed to ${isEditing ? "update" : "create"} expense`,
       });
     }
   };
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Expense",
+      "Are you sure you want to delete this expense?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteExpense.mutateAsync(expenseId);
+              router.back();
+            } catch {
+              Alert.alert("Error", "Failed to delete expense");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  if (isEditing && isLoadingExpense) {
+    return (
+      <View
+        className={`flex-1 items-center justify-center ${isDark ? "bg-dark-bg" : "bg-slate-50"}`}
+      >
+        <ActivityIndicator size="large" color="#10b981" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-dark-bg" : "bg-slate-50"}`}>
@@ -84,9 +160,15 @@ export default function AddExpenseModal() {
               isDark ? "text-dark-text" : "text-slate-900"
             }`}
           >
-            Add Expense
+            {isEditing ? "Edit Expense" : "Add Expense"}
           </Text>
-          <View style={{ width: 24 }} />
+          {isEditing ? (
+            <Pressable onPress={handleDelete}>
+              <MaterialIcons name="delete-outline" size={24} color="#ef4444" />
+            </Pressable>
+          ) : (
+            <View style={{ width: 24 }} />
+          )}
         </View>
 
         <ScrollView
@@ -117,7 +199,7 @@ export default function AddExpenseModal() {
                   isDark ? "text-dark-text" : "text-slate-900"
                 }`}
               >
-                ₹
+                {currencySymbol}
               </Text>
               <AppInput
                 label=""
@@ -250,9 +332,9 @@ export default function AddExpenseModal() {
 
           {/* Submit */}
           <AppButton
-            title="Add Expense"
+            title={isEditing ? "Save Changes" : "Add Expense"}
             onPress={handleSubmit}
-            loading={createExpense.isPending}
+            loading={createExpense.isPending || updateExpense.isPending}
             className="mt-2 mb-8"
           />
         </ScrollView>

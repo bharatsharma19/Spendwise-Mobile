@@ -1,12 +1,13 @@
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import AppButton from "@/src/components/AppButton";
 import ScreenWrapper from "@/src/components/ScreenWrapper";
+import SelectionModal from "@/src/components/SelectionModal";
 import { useProfile, useUpdatePreferences } from "@/src/hooks/useProfile";
 import { useAuthStore } from "@/src/store/auth.store";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import { Alert, Appearance, Pressable, Switch, Text, View } from "react-native";
-import SelectionModal from "@/src/components/SelectionModal";
 
 const CURRENCIES = [
   { code: "INR", label: "₹ INR — Indian Rupee" },
@@ -49,6 +50,7 @@ export default function ProfileScreen() {
   };
 
   const toggleDarkMode = () => {
+    Haptics.selectionAsync();
     const newTheme = isDark ? "light" : "dark";
     Appearance.setColorScheme(newTheme);
     updatePreferences.mutate({ theme: newTheme });
@@ -59,6 +61,7 @@ export default function ProfileScreen() {
   };
 
   const handleNotificationToggle = (val: boolean) => {
+    Haptics.selectionAsync();
     updatePreferences.mutate({
       notifications: {
         email: val,

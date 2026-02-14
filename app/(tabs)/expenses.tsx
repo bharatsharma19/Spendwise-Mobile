@@ -2,7 +2,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import EmptyState from "@/src/components/EmptyState";
 import ExpenseCard from "@/src/components/ExpenseCard";
 import { ExpenseCardSkeleton } from "@/src/components/SkeletonLoader";
-import { useExpenses } from "@/src/hooks/useExpenses";
+import { useInfiniteExpenses } from "@/src/hooks/useExpenses";
 import {
   EXPENSE_CATEGORIES,
   ExpenseCategory,
@@ -11,7 +11,14 @@ import {
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { FlatList, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ExpensesScreen() {
@@ -32,16 +39,29 @@ export default function ExpensesScreen() {
   );
 
   const {
-    data: expenses,
+    data,
     isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
     refetch,
-  } = useExpenses(selectedCategory ? filters : undefined);
+  } = useInfiniteExpenses(selectedCategory ? filters : undefined);
+
+  const expenses = useMemo(() => {
+    return data?.pages.flatMap((page) => page.data) || [];
+  }, [data]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
   }, [refetch]);
+
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <SafeAreaView
@@ -156,11 +176,28 @@ export default function ExpensesScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View className="px-5">
-              <ExpenseCard expense={item} />
+              <ExpenseCard
+                expense={item}
+                onPress={() =>
+                  router.push({
+                    pathname: "/modal",
+                    params: { expenseId: item.id },
+                  })
+                }
+              />
             </View>
           )}
           refreshing={refreshing}
           onRefresh={onRefresh}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View className="py-4">
+                <ActivityIndicator color="#10b981" />
+              </View>
+            ) : null
+          }
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 100, paddingTop: 8 }}
         />

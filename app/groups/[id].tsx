@@ -1,22 +1,23 @@
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import apiClient from "@/src/api/axios";
-import { Group, GroupAnalyticsResponse } from "@/src/types";
+import { useGroup, useGroupAnalytics } from "@/src/hooks/useGroups";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { formatCurrencyAmount } from "@/src/utils/currency";
 
 export default function GroupDetailsScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -27,35 +28,46 @@ export default function GroupDetailsScreen() {
     isLoading: isLoadingGroup,
     refetch: refetchGroup,
     error: groupError,
-  } = useQuery({
-    queryKey: ["group", id],
-    queryFn: async () => {
-      const res = await apiClient.get<{ data: Group }>(`/groups/${id}`);
-      return res.data.data;
-    },
-    enabled: !!id,
-  });
+  } = useGroup(id!);
 
   // Fetch Group Analytics
   const {
     data: analytics,
     isLoading: isLoadingAnalytics,
     refetch: refetchAnalytics,
-  } = useQuery({
-    queryKey: ["group-analytics", id],
-    queryFn: async () => {
-      const res = await apiClient.get<{ data: GroupAnalyticsResponse }>(
-        `/groups/${id}/analytics`,
-      );
-      return res.data.data;
-    },
-    enabled: !!id,
-  });
+  } = useGroupAnalytics(id!);
 
   const onRefresh = React.useCallback(() => {
     refetchGroup();
     refetchAnalytics();
   }, [refetchGroup, refetchAnalytics]);
+
+  const handleInvite = async () => {
+    if (!group) return;
+    try {
+      const result = await Share.share({
+        message: `Join my group "${group.name}" on SpendWise! Use code: ${group.code}`,
+      });
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // shared with activity type of result.activityType
+        } else {
+          // shared
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // dismissed
+      }
+    } catch (error: any) {
+      Alert.alert(error.message);
+    }
+  };
+
+  const handleAddExpense = () => {
+    router.push({
+      pathname: "/groups/add-expense" as any,
+      params: { groupId: id },
+    });
+  };
 
   const isLoading = isLoadingGroup || isLoadingAnalytics;
 
@@ -191,7 +203,10 @@ export default function GroupDetailsScreen() {
                   isDark ? "text-dark-text" : "text-slate-900"
                 }`}
               >
-                {analytics?.totalExpenses.toFixed(2) || "0.00"}
+                {formatCurrencyAmount(
+                  analytics?.totalExpenses || 0,
+                  group.currency || "INR",
+                )}
               </Text>
               <Text
                 className={`text-xs ${
@@ -290,7 +305,10 @@ export default function GroupDetailsScreen() {
                       }`}
                     >
                       {analytics.memberBalances[member.userId] > 0 ? "+" : ""}
-                      {analytics.memberBalances[member.userId].toFixed(2)}
+                      {formatCurrencyAmount(
+                        analytics.memberBalances[member.userId],
+                        group.currency || "INR",
+                      )}
                     </Text>
                     <Text
                       className={`text-[10px] ${
@@ -309,6 +327,7 @@ export default function GroupDetailsScreen() {
         {/* Actions Placeholder */}
         <View className="flex-row gap-3">
           <Pressable
+            onPress={handleAddExpense}
             className="flex-1 bg-primary-500 py-4 rounded-xl items-center flex-row justify-center"
             style={{
               shadowColor: "#10b981",
@@ -323,6 +342,7 @@ export default function GroupDetailsScreen() {
           </Pressable>
 
           <Pressable
+            onPress={handleInvite}
             className={`flex-1 py-4 rounded-xl items-center flex-row justify-center border ${
               isDark
                 ? "border-slate-700 bg-slate-800"

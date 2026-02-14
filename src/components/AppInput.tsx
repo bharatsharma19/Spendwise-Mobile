@@ -19,6 +19,7 @@ interface AppInputProps {
   editable?: boolean;
   multiline?: boolean;
   numberOfLines?: number;
+  maxLength?: number;
   icon?: React.ReactNode;
   className?: string;
 }
@@ -35,6 +36,7 @@ export default function AppInput({
   editable = true,
   multiline = false,
   numberOfLines = 1,
+  maxLength,
   icon,
   className = "",
 }: AppInputProps) {
@@ -73,6 +75,7 @@ export default function AppInput({
           editable={editable}
           multiline={multiline}
           numberOfLines={numberOfLines}
+          maxLength={maxLength}
           className={`flex-1 text-base ${
             isDark ? "text-dark-text" : "text-slate-900"
           }`}

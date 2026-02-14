@@ -45,3 +45,30 @@ export interface GroupAnalyticsResponse {
   memberBalances: Record<string, number>;
   expenseByCategory: Record<string, number>;
 }
+
+export interface GroupMemberResponse {
+  id: string;
+  userId: string;
+  displayName: string;
+  email: string;
+  role: "admin" | "member";
+  joinedAt: string;
+}
+
+export interface GroupExpenseResponse {
+  id: string;
+  amount: number;
+  currency: string;
+  category: string;
+  description?: string;
+  date: string;
+  paidBy: string;
+  splits: {
+    userId: string;
+    amount: number;
+    status: "paid" | "pending";
+    paidAt?: string;
+  }[];
+  createdAt: string;
+  updatedAt: string;
+}
