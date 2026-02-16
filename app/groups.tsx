@@ -389,7 +389,7 @@ export default function GroupsScreen() {
                 }}
               >
                 <MaterialIcons
-                  name="attach-money"
+                  name="currency-exchange"
                   size={20}
                   color={isDark ? "#94a3b8" : "#64748b"}
                 />
@@ -557,7 +557,6 @@ export default function GroupsScreen() {
         options={CURRENCIES.map((c) => ({
           label: `${c.label} (${c.symbol})`,
           value: c.code,
-          icon: "attach-money",
         }))}
         onSelect={setCurrency}
         selectedValue={currency}

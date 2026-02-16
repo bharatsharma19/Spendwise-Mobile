@@ -82,7 +82,7 @@ export default function ExpenseCard({ expense, onPress }: ExpenseCardProps) {
 
       {/* Amount */}
       <Text className="text-base font-bold text-danger-500">
-        -{formatCurrency(expense.amount)}
+        -{formatCurrency(expense.amount, expense.currency || "INR")}
       </Text>
     </Pressable>
   );

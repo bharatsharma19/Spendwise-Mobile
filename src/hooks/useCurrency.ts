@@ -7,8 +7,8 @@ export const useCurrency = () => {
   const currencyCode = user?.preferences?.currency || "INR";
 
   const formatCurrency = useCallback(
-    (amount: number) => {
-      return formatCurrencyAmount(amount, currencyCode);
+    (amount: number, currency?: string) => {
+      return formatCurrencyAmount(amount, currency || currencyCode);
     },
     [currencyCode],
   );

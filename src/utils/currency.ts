@@ -1,4 +1,21 @@
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  INR: "₹",
+  JPY: "¥",
+  AUD: "A$",
+  CAD: "C$",
+  CHF: "Fr",
+  CNY: "¥",
+  NZD: "NZ$",
+};
+
 export const getCurrencySymbol = (currencyCode: string): string => {
+  if (CURRENCY_SYMBOLS[currencyCode]) {
+    return CURRENCY_SYMBOLS[currencyCode];
+  }
+
   try {
     const locale = currencyCode === "INR" ? "en-IN" : "en-US";
     return (
@@ -24,9 +41,9 @@ export const formatCurrencyAmount = (
       style: "currency",
       currency: currencyCode,
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0, // Simplified for now
+      maximumFractionDigits: 2,
     }).format(amount);
   } catch {
-    return `${currencyCode} ${amount}`;
+    return `${currencyCode} ${amount.toFixed(2)}`;
   }
 };

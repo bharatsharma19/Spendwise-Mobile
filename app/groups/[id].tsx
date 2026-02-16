@@ -1,26 +1,44 @@
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useGroup, useGroupAnalytics } from "@/src/hooks/useGroups";
+import apiClient from "@/src/api/axios";
+import {
+  useGroup,
+  useGroupAnalytics,
+  useGroupExpenses,
+} from "@/src/hooks/useGroups";
+import { useAuthStore } from "@/src/store/auth.store";
+import { formatCurrencyAmount } from "@/src/utils/currency";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   Share,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { formatCurrencyAmount } from "@/src/utils/currency";
 
 export default function GroupDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  const [isEditModalVisible, setIsEditModalVisible] = React.useState(false);
+  const [editName, setEditName] = React.useState("");
+  const [editDescription, setEditDescription] = React.useState("");
+  const [isSaving, setIsSaving] = React.useState(false);
 
   // Fetch Group Details
   const {
@@ -30,17 +48,85 @@ export default function GroupDetailsScreen() {
     error: groupError,
   } = useGroup(id!);
 
-  // Fetch Group Analytics
+  /* Fetch Group Analytics */
   const {
     data: analytics,
     isLoading: isLoadingAnalytics,
     refetch: refetchAnalytics,
   } = useGroupAnalytics(id!);
 
+  // Fetch Group Expenses
+  const {
+    data: expenses,
+    isLoading: expensesLoading,
+    refetch: refetchExpenses,
+  } = useGroupExpenses(id!);
+
   const onRefresh = React.useCallback(() => {
     refetchGroup();
     refetchAnalytics();
-  }, [refetchGroup, refetchAnalytics]);
+    refetchExpenses();
+  }, [refetchGroup, refetchAnalytics, refetchExpenses]);
+
+  React.useEffect(() => {
+    if (group) {
+      setEditName(group.name);
+      setEditDescription(group.description || "");
+    }
+  }, [group]);
+
+  const handleDeleteGroup = () => {
+    Alert.alert(
+      "Delete Group",
+      "Are you sure you want to delete this group? This action cannot be undone and will remove all members and expenses.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await apiClient.delete(`/groups/${id}`);
+              queryClient.invalidateQueries({ queryKey: ["groups"] });
+              Alert.alert("Success", "Group deleted successfully");
+              router.replace("/groups");
+            } catch (error: any) {
+              const msg =
+                error?.response?.data?.message || "Failed to delete group";
+              Alert.alert("Error", msg);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleUpdateGroup = async () => {
+    if (!editName.trim()) {
+      Alert.alert("Error", "Group name is required");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const res = await apiClient.put(`/groups/${id}`, {
+        name: editName.trim(),
+        description: editDescription.trim(),
+      });
+
+      if (res.data.status === "success") {
+        await refetchGroup();
+        setIsEditModalVisible(false);
+        queryClient.invalidateQueries({ queryKey: ["groups"] }); // Update list as well
+        Alert.alert("Success", "Group updated successfully");
+      }
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || "Failed to update group";
+      Alert.alert("Error", msg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleInvite = async () => {
     if (!group) return;
@@ -136,7 +222,29 @@ export default function GroupDetailsScreen() {
         >
           Group Details
         </Text>
-        <View className="w-10" />
+
+        {group && user && group.created_by === user.id ? (
+          <View className="flex-row gap-2">
+            <Pressable
+              onPress={() => setIsEditModalVisible(true)}
+              className="w-10 h-10 items-center justify-center rounded-full active:bg-slate-100 dark:active:bg-slate-800"
+            >
+              <MaterialIcons
+                name="edit"
+                size={22}
+                color={isDark ? "#f1f5f9" : "#0f172a"}
+              />
+            </Pressable>
+            <Pressable
+              onPress={handleDeleteGroup}
+              className="w-10 h-10 items-center justify-center rounded-full active:bg-red-100 dark:active:bg-red-900/30"
+            >
+              <MaterialIcons name="delete-outline" size={22} color="#ef4444" />
+            </Pressable>
+          </View>
+        ) : (
+          <View className="w-10" />
+        )}
       </View>
 
       <ScrollView
@@ -253,7 +361,7 @@ export default function GroupDetailsScreen() {
           >
             {group.members.map((member, index) => (
               <View
-                key={member.id}
+                key={member.userId}
                 className={`flex-row items-center p-4 ${
                   index !== group.members.length - 1
                     ? "border-b border-slate-100 dark:border-slate-800"
@@ -324,6 +432,93 @@ export default function GroupDetailsScreen() {
           </View>
         </View>
 
+        {/* Group Expenses Section */}
+        <View className="mb-6">
+          <View className="flex-row items-center justify-between mb-3">
+            <Text
+              className={`text-lg font-bold ${
+                isDark ? "text-dark-text" : "text-slate-900"
+              }`}
+            >
+              Recent Expenses
+            </Text>
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: "/groups/group-expenses" as any,
+                  params: { groupId: id },
+                })
+              }
+            >
+              <Text className="text-primary-500 font-bold">See All</Text>
+            </Pressable>
+          </View>
+
+          <View
+            className={`rounded-2xl overflow-hidden ${
+              isDark ? "bg-dark-card" : "bg-white"
+            }`}
+          >
+            {expensesLoading ? (
+              <View className="p-4 items-center">
+                <ActivityIndicator
+                  size="small"
+                  color={isDark ? "white" : "black"}
+                />
+              </View>
+            ) : expenses?.length === 0 ? (
+              <View className="p-4 items-center">
+                <Text className={isDark ? "text-slate-400" : "text-slate-500"}>
+                  No expenses yet.
+                </Text>
+              </View>
+            ) : (
+              expenses?.map((expense, index) => (
+                <View
+                  key={expense.id}
+                  className={`flex-row items-center p-4 ${
+                    index !== (expenses?.length || 0) - 1
+                      ? "border-b border-slate-100 dark:border-slate-800"
+                      : ""
+                  }`}
+                >
+                  <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
+                    <MaterialIcons name="receipt" size={20} color="#3b82f6" />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className={`font-semibold ${
+                        isDark ? "text-dark-text" : "text-slate-900"
+                      }`}
+                    >
+                      {expense.description}
+                    </Text>
+                    <Text
+                      className={`text-xs ${
+                        isDark ? "text-dark-muted" : "text-slate-500"
+                      }`}
+                    >
+                      {new Date(expense.date).toLocaleDateString()} • by{" "}
+                      {group.members.find((m) => m.userId === expense.paidBy)
+                        ?.displayName || "Unknown"}
+                    </Text>
+                  </View>
+                  <Text
+                    className={`font-bold ${
+                      isDark ? "text-dark-text" : "text-slate-900"
+                    }`}
+                  >
+                    {formatCurrencyAmount(
+                      expense.amount,
+                      expense.currency || group.currency || "INR",
+                    )}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+
         {/* Actions Placeholder */}
         <View className="flex-row gap-3">
           <Pressable
@@ -364,6 +559,78 @@ export default function GroupDetailsScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <Modal
+        visible={isEditModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1 justify-end"
+        >
+          <View className="flex-1 bg-black/50 justify-end">
+            <View
+              className={`rounded-t-3xl p-6 ${isDark ? "bg-dark-card" : "bg-white"}`}
+            >
+              <View className="flex-row justify-between items-center mb-6">
+                <Text
+                  className={`text-xl font-bold ${isDark ? "text-dark-text" : "text-slate-900"}`}
+                >
+                  Edit Group
+                </Text>
+                <Pressable onPress={() => setIsEditModalVisible(false)}>
+                  <MaterialIcons
+                    name="close"
+                    size={24}
+                    color={isDark ? "#94a3b8" : "#64748b"}
+                  />
+                </Pressable>
+              </View>
+
+              <Text
+                className={`text-sm font-semibold mb-1.5 ${isDark ? "text-dark-text" : "text-slate-700"}`}
+              >
+                Group Name *
+              </Text>
+              <TextInput
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Group Name"
+                placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
+                className={`px-4 py-3 rounded-xl mb-4 ${isDark ? "bg-dark-bg text-dark-text" : "bg-slate-50 text-slate-900"}`}
+              />
+
+              <Text
+                className={`text-sm font-semibold mb-1.5 ${isDark ? "text-dark-text" : "text-slate-700"}`}
+              >
+                Description
+              </Text>
+              <TextInput
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="Description"
+                placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
+                className={`px-4 py-3 rounded-xl mb-6 ${isDark ? "bg-dark-bg text-dark-text" : "bg-slate-50 text-slate-900"}`}
+              />
+
+              <Pressable
+                onPress={handleUpdateGroup}
+                disabled={isSaving}
+                className={`py-4 rounded-xl items-center mb-6 ${isSaving ? "bg-primary-300" : "bg-primary-500"}`}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text className="text-white font-bold text-base">
+                    Save Changes
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }

@@ -30,13 +30,13 @@ export interface Group {
   description?: string;
   currency: string;
   code: string;
-  createdBy: string;
+  created_by: string;
   status: "active" | "archived";
   totalExpenses: number;
   totalMembers: number;
   members: GroupMember[];
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface GroupAnalyticsResponse {

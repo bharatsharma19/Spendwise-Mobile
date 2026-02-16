@@ -25,6 +25,29 @@ export function useUpdatePreferences() {
 
   return useMutation({
     mutationFn: (data: UpdatePreferencesDto) => userApi.updatePreferences(data),
+    onMutate: async (newPreferences) => {
+      await queryClient.cancelQueries({ queryKey: ["profile"] });
+      const previousProfile = queryClient.getQueryData<any>(["profile"]);
+      if (previousProfile) {
+        queryClient.setQueryData(["profile"], {
+          ...previousProfile,
+          preferences: {
+            ...previousProfile.preferences,
+            ...newPreferences,
+            notifications: {
+              ...previousProfile.preferences?.notifications,
+              ...(newPreferences.notifications || {}),
+            },
+          },
+        });
+      }
+      return { previousProfile };
+    },
+    onError: (err, newTodo, context) => {
+      if (context?.previousProfile) {
+        queryClient.setQueryData(["profile"], context.previousProfile);
+      }
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
     },

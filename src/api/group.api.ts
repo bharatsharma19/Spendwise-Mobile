@@ -79,4 +79,15 @@ export const groupApi = {
     );
     return response.data.data;
   },
+
+  getGroupExpenses: async (
+    groupId: string,
+    params?: { limit?: number; offset?: number },
+  ): Promise<GroupExpenseResponse[]> => {
+    const response = await apiClient.get<{ data: GroupExpenseResponse[] }>(
+      `/groups/${groupId}/expenses`,
+      { params },
+    );
+    return response.data.data;
+  },
 };

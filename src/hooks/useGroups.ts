@@ -29,6 +29,14 @@ export function useGroupAnalytics(id: string) {
   });
 }
 
+export function useGroupExpenses(id: string) {
+  return useQuery({
+    queryKey: ["group-expenses", id],
+    queryFn: () => groupApi.getGroupExpenses(id),
+    enabled: !!id,
+  });
+}
+
 export function useCreateGroup() {
   const queryClient = useQueryClient();
 
